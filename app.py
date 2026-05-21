@@ -140,8 +140,9 @@ if st.button("🚀 KÍCH HOẠT AI ĐỊNH GIÁ", use_container_width=True):
         # Tính toán tuổi xe Car_Age
         car_age = 2024 - prod_year
         
-        # Sắp xếp đúng 15 cột theo thứ tự train: Levy, Manufacturer, Model, Category, Fuel type, Engine volume, Mileage, Leather interior, Cylinders, Gear box type, Drive wheels, Color, Airbags, is_Turbo, Car_Age
+        # Sắp xếp đúng 16 cột theo thứ tự train (bao gồm ID giả lập ở đầu): ID, Levy, Manufacturer, Model, Category, Fuel type, Engine volume, Mileage, Leather interior, Cylinders, Gear box type, Drive wheels, Color, Airbags, is_Turbo, Car_Age
         X_input = np.array([[
+            0,                      # 0. ID (giả lập cột ID ban đầu)
             levy,                   # 1. Levy
             encoded_manufacturer,   # 2. Manufacturer
             encoded_model,          # 3. Model
