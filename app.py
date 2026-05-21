@@ -6,14 +6,30 @@ import pickle
 # 1. BẮT BUỘC IMPORT CLASS CODE TAY TRƯỚC KHI LOAD MODEL
 from lib import Node, DecisionTree, RandomForest
 
-st.set_page_config(page_title="Định Giá Xe Nhóm 5", page_icon="🚗", layout="wide")
+st.set_page_config(page_title="Định Giá Xe Nhóm 11", page_icon="🚗", layout="wide")
 
 # 2. HÀM LOAD ASSETS VÀ HOTFIX PHÔNG CHỮ TỰ ĐỘNG
 @st.cache_resource
 def load_assets():
-    # Load mô hình Random Forest code tay
-    with open("best_rf_model.pkl", "rb") as f:
-        model = pickle.load(f)
+    # Load mô hình Random Forest code tay (hỗ trợ cả file .pkl.gz nén, .pkl gốc và random_forest_model.pkl)
+    import os
+    import gzip
+    
+    model_path = "best_rf_model.pkl"
+    compressed_path = "best_rf_model.pkl.gz"
+    fallback_path = "random_forest_model.pkl"
+    
+    if os.path.exists(compressed_path):
+        with gzip.open(compressed_path, "rb") as f:
+            model = pickle.load(f)
+    elif os.path.exists(model_path):
+        with open(model_path, "rb") as f:
+            model = pickle.load(f)
+    elif os.path.exists(fallback_path):
+        with open(fallback_path, "rb") as f:
+            model = pickle.load(f)
+    else:
+        raise FileNotFoundError("Không tìm thấy bất kỳ file mô hình nào (.pkl.gz hoặc .pkl)")
         
     # Load từ điển mã hóa Target Encoding
     with open("target_encoders.pkl", "rb") as f:
@@ -36,8 +52,8 @@ def load_assets():
 try:
     model, encoders = load_assets()
     global_mean = encoders.get('global_mean', 15000)
-except FileNotFoundError:
-    st.error("❌ Thiếu file 'random_forest_model.pkl' hoặc 'target_encoders.pkl'. Vui lòng kiểm tra lại thư mục!")
+except FileNotFoundError as e:
+    st.error(f"❌ Không tìm thấy file mô hình (.pkl) hoặc 'target_encoders.pkl' trong thư mục! Chi tiết lỗi: {e}")
     st.stop()
 
 # ==========================================
