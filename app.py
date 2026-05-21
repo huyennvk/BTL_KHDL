@@ -59,7 +59,7 @@ except FileNotFoundError as e:
 # ==========================================
 # GIAO DIỆN NHẬP LIỆU CHÍNH
 # ==========================================
-st.title("🚗 Định Giá Xe Cũ (Nhóm 5)")
+st.title("🚗 Định Giá Xe Cũ")
 st.markdown("Nhập các thông số chiếc xe của bạn, AI sẽ phân tích xu hướng thị trường và đưa ra mức giá hợp lý nhất!")
 st.markdown("---")
 
