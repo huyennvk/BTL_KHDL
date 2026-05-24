@@ -2,22 +2,22 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import pickle
+import os
+import gzip
 
-# 1. BẮT BUỘC IMPORT CLASS CODE TAY TRƯỚC KHI LOAD MODEL
-from lib import Node, DecisionTree, RandomForest
-
+# 1. CẤU HÌNH TRANG WEB CHÍNH
 st.set_page_config(page_title="Định Giá Xe Nhóm 11", page_icon="🚗", layout="wide")
 
-# 2. HÀM LOAD ASSETS VÀ HOTFIX PHÔNG CHỮ TỰ ĐỘNG
+# (CSS has been removed to use default Streamlit theme)
+
+
+
+# 3. HÀM LOAD ASSETS VÀ TIỀN XỬ LÝ PHÔNG CHỮ TỰ ĐỘNG
 @st.cache_resource
 def load_assets():
-    # Load mô hình Random Forest code tay (hỗ trợ cả file .pkl.gz nén, .pkl gốc và random_forest_model.pkl)
-    import os
-    import gzip
-    
+    # Load mô hình Random Forest từ thư viện scikit-learn
     model_path = "best_rf_model.pkl"
     compressed_path = "best_rf_model.pkl.gz"
-    fallback_path = "random_forest_model.pkl"
     
     if os.path.exists(compressed_path):
         with gzip.open(compressed_path, "rb") as f:
@@ -25,11 +25,8 @@ def load_assets():
     elif os.path.exists(model_path):
         with open(model_path, "rb") as f:
             model = pickle.load(f)
-    elif os.path.exists(fallback_path):
-        with open(fallback_path, "rb") as f:
-            model = pickle.load(f)
     else:
-        raise FileNotFoundError("Không tìm thấy bất kỳ file mô hình nào (.pkl.gz hoặc .pkl)")
+        raise FileNotFoundError("Không tìm thấy file mô hình Random Forest (best_rf_model.pkl hoặc best_rf_model.pkl.gz)")
         
     # Load từ điển mã hóa Target Encoding
     with open("target_encoders.pkl", "rb") as f:
@@ -48,7 +45,8 @@ def load_assets():
             
     return model, encoders
 
-# Khởi chạy nạp tài nguyên
+
+# Khởi chạy nạp tài nguyên hệ thống
 try:
     model, encoders = load_assets()
     global_mean = encoders.get('global_mean', 15000)
@@ -56,14 +54,15 @@ except FileNotFoundError as e:
     st.error(f"❌ Không tìm thấy file mô hình (.pkl) hoặc 'target_encoders.pkl' trong thư mục! Chi tiết lỗi: {e}")
     st.stop()
 
+
 # ==========================================
 # GIAO DIỆN NHẬP LIỆU CHÍNH
 # ==========================================
 st.title("🚗 Định Giá Xe Cũ")
-st.markdown("Nhập các thông số chiếc xe của bạn, AI sẽ phân tích xu hướng thị trường và đưa ra mức giá hợp lý nhất!")
-st.markdown("---")
+st.write("Nhập các thông số chiếc xe của bạn, AI sẽ phân tích xu hướng thị trường và đưa ra mức giá hợp lý nhất!")
+st.divider()
 
-st.header("📋 Thông số kỹ thuật")
+st.header("📋 Thông số kỹ thuật của xe")
 
 col1, col2, col3 = st.columns(3)
 
@@ -80,7 +79,7 @@ with col1:
         model_list = sorted(list(set(['Other' if '?' in str(m) or 'სხვა' in str(m) else m for m in raw_models])))
     else:
         raw_models = list(encoders.get('Model', {"Other": 0}).keys())
-        model_list = sorted(list(set(['Other' if '?' in str(m) or 'სხვა' in str(m) else m for m in raw_models])))
+        model_list = sorted(list(set(['Other' if '?' in str(m) or 'სứа' in str(m) else m for m in raw_models])))
         
     car_model = st.selectbox("Dòng xe (Model)", model_list)
     
@@ -113,18 +112,19 @@ with col3:
     drive_list = sorted(list(encoders.get('Drive wheels', {"Front": 0}).keys()))
     drive_wheels = st.selectbox("Hệ thống dẫn động", drive_list)
     
-    # 🔥 ĐÃ CẬP NHẬT: Thanh trượt (slider) đổi thành Hộp chọn (selectbox) từ 0 đến 16 túi khí
+    # Số lượng túi khí an toàn
     airbags = st.selectbox("Số lượng túi khí an toàn", list(range(17)), index=4) 
     
     levy = st.number_input("Thuế nhập khẩu / Phí trước bạ (Levy - USD)", min_value=0, value=1000)
 
-st.markdown("---")
+st.divider()
+
 
 # ==========================================
-# XỬ LÝ LOGIC KHI BẤM NÚT ĐỰ ĐOÁN
+# XỬ LÝ LOGIC KHI BẤM NÚT DỰ ĐOÁN
 # ==========================================
 if st.button("🚀 KÍCH HOẠT AI ĐỊNH GIÁ", use_container_width=True):
-    with st.spinner("Mô hình Random Forest đang xử lý dữ liệu..."):
+    with st.spinner("Mô hình Random Forest đang phân tích dữ liệu thị trường..."):
         
         encoded_manufacturer = encoders['Manufacturer'].get(manufacturer, global_mean)
         encoded_model = encoders['Model'].get(car_model, global_mean)
@@ -140,9 +140,14 @@ if st.button("🚀 KÍCH HOẠT AI ĐỊNH GIÁ", use_container_width=True):
         # Tính toán tuổi xe Car_Age
         car_age = 2024 - prod_year
         
-        # Sắp xếp đúng 16 cột theo thứ tự train (bao gồm ID giả lập ở đầu): ID, Levy, Manufacturer, Model, Category, Fuel type, Engine volume, Mileage, Leather interior, Cylinders, Gear box type, Drive wheels, Color, Airbags, is_Turbo, Car_Age
-        X_input = np.array([[
-            0,                      # 0. ID (giả lập cột ID ban đầu)
+        # Tạo DataFrame chứa đúng 15 đặc trưng cho mô hình scikit-learn (Loại bỏ cột ID)
+        feature_names = [
+            'Levy', 'Manufacturer', 'Model', 'Category', 'Fuel type', 
+            'Engine volume', 'Mileage', 'Leather interior', 'Cylinders', 
+            'Gear box type', 'Drive wheels', 'Color', 'Airbags', 'is_Turbo', 'Car_Age'
+        ]
+        
+        X_input = pd.DataFrame([[
             levy,                   # 1. Levy
             encoded_manufacturer,   # 2. Manufacturer
             encoded_model,          # 3. Model
@@ -158,12 +163,24 @@ if st.button("🚀 KÍCH HOẠT AI ĐỊNH GIÁ", use_container_width=True):
             airbags,                # 13. Airbags
             turbo_val,              # 14. is_Turbo
             car_age                 # 15. Car_Age
-        ]])
+        ]], columns=feature_names)
         
         try:
+            # Dự đoán giá xe bằng mô hình scikit-learn
             pred_price = model.predict(X_input)[0]
-            st.success("🎉 PHÂN TÍCH THỊ TRƯỜNG HOÀN TẤT!")
-            st.markdown(f"<h1 style='text-align: center; color: #ff4b4b;'>${pred_price:,.0f}</h1>", unsafe_allow_html=True)
-            st.info("💡 Kết quả được tính toán dựa trên thuật toán Random Forest, phản ánh mức độ khấu hao thực tế.")
+            
+            # Hiển thị kết quả định giá bằng Streamlit Components mặc định
+            st.success("🎉 PHÂN TÍCH THỊ TRƯỜNG HOÀN TẤT")
+            
+            # Căn giữa thông tin dự đoán bằng HTML/inline CSS đơn giản
+            st.markdown(f"""
+            <div style="text-align: center; margin: 1.5rem 0;">
+                <div style="font-size: 1.2rem; color: #64748b;">Mức giá hợp lý ước tính cho chiếc xe của bạn là:</div>
+                <div style="font-size: 3.5rem; font-weight: bold; color: #10b981; margin: 10px 0;">${pred_price:,.0f}</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.info("💡 Kết quả được tính toán dựa trên thuật toán Random Forest từ thư viện scikit-learn, phản ánh chính xác khấu hao thực tế của thị trường.")
+            
         except Exception as e:
             st.error(f"❌ Lỗi xử lý cấu trúc mô hình: {e}")
