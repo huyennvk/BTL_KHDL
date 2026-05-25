@@ -8,10 +8,6 @@ import gzip
 # 1. CẤU HÌNH TRANG WEB CHÍNH
 st.set_page_config(page_title="Định Giá Xe Nhóm 11", page_icon="🚗", layout="wide")
 
-# (CSS has been removed to use default Streamlit theme)
-
-
-
 # 3. HÀM LOAD ASSETS VÀ TIỀN XỬ LÝ PHÔNG CHỮ TỰ ĐỘNG
 @st.cache_resource
 def load_assets():
